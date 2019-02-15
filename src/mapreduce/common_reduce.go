@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sort"
 )
 
 func doReduce(
@@ -81,9 +82,17 @@ func doReduce(
 	}
 
 	enc := json.NewEncoder(writer)
-	for k, v := range kvs {
-		result := reduceF(k, v)
-		reducedKv := KeyValue{Key: k, Value: result}
+
+	keys := make([]string, 0, len(kvs))
+	for k := range kvs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		// Note that by using map, the keys are already sorted
+		reducedValues := reduceF(k, kvs[k])
+		reducedKv := KeyValue{Key: k, Value: reducedValues}
 		enc.Encode(&reducedKv)
 	}
 }

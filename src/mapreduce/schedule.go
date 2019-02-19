@@ -2,15 +2,16 @@ package mapreduce
 
 import "fmt"
 
-func worker(workerAddr string, jobs <-chan *DoTaskArgs, results chan<- int) {
+func worker(workerAddr string, jobs <-chan *DoTaskArgs, results chan<- *DoTaskArgs) {
 	// worker will accept jobs
 	// and then process them one by one
 	for j := range jobs {
 		ok := call(workerAddr, "Worker.DoTask", j, new(struct{}))
 		if ok == false {
 			fmt.Printf("Run Task failed on %s\n", workerAddr)
+			results <- j
 		} else {
-			results <- 1
+			results <- nil
 		}
 	}
 }
@@ -45,7 +46,7 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 	//
 
 	jobs := make(chan *DoTaskArgs, 100)
-	results := make(chan int, 100)
+	results := make(chan *DoTaskArgs, 100)
 
 	go func(rc chan string) {
 		for {
@@ -64,10 +65,14 @@ func schedule(jobName string, mapFiles []string, nReduce int, phase jobPhase, re
 
 		jobs <- args
 	}
-	close(jobs)
 
-	for i := 0; i < ntasks; i++ {
-		<-results
+	for i := 0; i < ntasks; {
+		res := <-results
+		if res != nil {
+			jobs <- res
+		} else {
+			i++
+		}
 	}
 
 	fmt.Printf("Schedule: %v done\n", phase)
